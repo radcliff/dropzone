@@ -1134,7 +1134,18 @@
             reader.readAsArrayBuffer(img.slice(0, 64 * 1024));
           }
 
-          var orientation = _getOrientation(img);
+          _rotationFromOrientation = function(orientation) {
+            switch (orientation) {
+              case 3: 
+                return 180;
+              case 6: 
+                return -90;
+              case 8: 
+                return 90; 
+            }
+          }
+
+          var orientation = _rotationFromOrientation( _getOrientation(img) );
 
           var canvas, ctx, resizeInfo, thumbnail, _ref, _ref1, _ref2, _ref3;
           file.width = img.width;
