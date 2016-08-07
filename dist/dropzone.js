@@ -1105,6 +1105,37 @@
       }
       img.onload = (function(_this) {
         return function() {
+
+          _getOrientation = function(img) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+
+              var view = new DataView(e.target.result);
+              if (view.getUint16(0, false) != 0xFFD8) return -2;
+              var length = view.byteLength, offset = 2;
+              while (offset < length) {
+                var marker = view.getUint16(offset, false);
+                offset += 2;
+                if (marker == 0xFFE1) {
+                  if (view.getUint32(offset += 2, false) != 0x45786966) return -1;
+                  var little = view.getUint16(offset += 6, false) == 0x4949;
+                  offset += view.getUint32(offset + 4, little);
+                  var tags = view.getUint16(offset, little);
+                  offset += 2;
+                  for (var i = 0; i < tags; i++)
+                    if (view.getUint16(offset + (i * 12), little) == 0x0112)
+                      return view.getUint16(offset + (i * 12) + 8, little);
+                }
+                else if ((marker & 0xFF00) != 0xFF00) break;
+                else offset += view.getUint16(offset, false);
+              }
+              return -1;
+            };
+            reader.readAsArrayBuffer(img.slice(0, 64 * 1024));
+          }
+
+          var orientation = _getOrientation(img);
+
           var canvas, ctx, resizeInfo, thumbnail, _ref, _ref1, _ref2, _ref3;
           file.width = img.width;
           file.height = img.height;
@@ -1119,7 +1150,7 @@
           ctx = canvas.getContext("2d");
           canvas.width = resizeInfo.trgWidth;
           canvas.height = resizeInfo.trgHeight;
-          drawImageIOSFix(ctx, img, (_ref = resizeInfo.srcX) != null ? _ref : 0, (_ref1 = resizeInfo.srcY) != null ? _ref1 : 0, resizeInfo.srcWidth, resizeInfo.srcHeight, (_ref2 = resizeInfo.trgX) != null ? _ref2 : 0, (_ref3 = resizeInfo.trgY) != null ? _ref3 : 0, resizeInfo.trgWidth, resizeInfo.trgHeight);
+          drawImageIOSFix(orientation, ctx, img, (_ref = resizeInfo.srcX) != null ? _ref : 0, (_ref1 = resizeInfo.srcY) != null ? _ref1 : 0, resizeInfo.srcWidth, resizeInfo.srcHeight, (_ref2 = resizeInfo.trgX) != null ? _ref2 : 0, (_ref3 = resizeInfo.trgY) != null ? _ref3 : 0, resizeInfo.trgWidth, resizeInfo.trgHeight);
           thumbnail = canvas.toDataURL("image/png");
           _this.emit("thumbnail", file, thumbnail);
           if (callback != null) {
@@ -1691,9 +1722,16 @@
     }
   };
 
-  drawImageIOSFix = function(ctx, img, sx, sy, sw, sh, dx, dy, dw, dh) {
+  drawImageIOSFix = function(o, ctx, img, sx, sy, sw, sh, dx, dy, dw, dh) {
     var vertSquashRatio;
     vertSquashRatio = detectVerticalSquash(img);
+
+    dh = dh / vertSquashRatio; 
+    ctx.translate( dx+dw/2, dy+dh/2 ); 
+    ctx.rotate(-o*Math.PI/180); 
+    dx = -dw/2; 
+    dy = -dh/2;
+
     return ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh / vertSquashRatio);
   };
 
